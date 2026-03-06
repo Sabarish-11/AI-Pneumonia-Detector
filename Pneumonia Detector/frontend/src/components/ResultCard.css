@@ -1,0 +1,44 @@
+.result-card {
+  margin-top: 24px;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 18px 16px;
+  border-radius: 14px;
+  text-align: center;
+}
+
+.result-card h2 {
+  font-size: 1.1rem;
+  margin-bottom: 10px;
+}
+
+.result-card p {
+  margin-bottom: 6px;
+  font-size: 1rem;
+}
+
+.result-card .normal {
+  color: #4caf50;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.result-card .pneumonia {
+  color: #ff5252;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.result-card .risk-high {
+  color: #ff5252;
+  font-size: 0.9rem;
+}
+
+.result-card .risk-medium {
+  color: #ffca28;
+  font-size: 0.9rem;
+}
+
+.result-card .risk-low {
+  color: #81c784;
+  font-size: 0.9rem;
+}
