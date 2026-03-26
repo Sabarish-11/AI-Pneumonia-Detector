@@ -1,5 +1,9 @@
 fastapi
-uvicorn
+uvicorn[standard]
 pillow
 numpy
 tensorflow
+sqlmodel
+python-jose[cryptography]
+passlib
+python-multipart

@@ -1,27 +1,44 @@
 from datetime import datetime, timedelta
 from typing import Optional
-import os
 import io
+import os
 
-from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, status
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
+from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlmodel import SQLModel, Field, Session, create_engine, select
+from sqlmodel import Field, SQLModel, Session, create_engine, select
 
-import tensorflow as tf
 import numpy as np
 from PIL import Image, UnidentifiedImageError
+import tensorflow as tf
 
 
 # =====================================================
 # APP CONFIG
 # =====================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'pneumonia_app.db')}"
+DEFAULT_DATABASE_PATH = os.path.join(BASE_DIR, "pneumonia_app.db")
 
-SECRET_KEY = "CHANGE_THIS_SECRET"
+
+def get_database_url():
+    database_url = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DATABASE_PATH}")
+    if database_url.startswith("postgres://"):
+        return database_url.replace("postgres://", "postgresql://", 1)
+    return database_url
+
+
+def get_allowed_origins():
+    origins = os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    )
+    return [origin.strip() for origin in origins.split(",") if origin.strip()]
+
+
+DATABASE_URL = get_database_url()
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-me")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024
@@ -35,7 +52,7 @@ app = FastAPI(title="Pneumonia Detection API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=get_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,12 +62,11 @@ app.add_middleware(
 # =====================================================
 # DATABASE
 # =====================================================
-# SQLite needs check_same_thread=False when used across threads (e.g., FastAPI workers).
-engine = create_engine(
-    DATABASE_URL,
-    echo=False,
-    connect_args={"check_same_thread": False},
-)
+engine_kwargs = {"echo": False}
+if DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 
 
 def create_db():
@@ -120,7 +136,7 @@ class LoginRequest(SQLModel):
 @app.on_event("startup")
 def startup():
     create_db()
-    print("✅ Database ready")
+    print("Database ready")
 
 
 # =====================================================
@@ -151,7 +167,7 @@ def get_current_user(
 MODEL_PATH = os.path.join(BASE_DIR, "model", "pneumonia_model.h5")
 
 if not os.path.exists(MODEL_PATH):
-    raise RuntimeError("❌ Model file not found")
+    raise RuntimeError("Model file not found")
 
 model = tf.keras.models.load_model(MODEL_PATH)
 
@@ -243,6 +259,11 @@ def validate_uploaded_image(file: UploadFile, file_bytes: bytes):
 @app.get("/")
 def root():
     return {"message": "API running"}
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 
 # ---------- REGISTER ----------

@@ -1,0 +1,8 @@
+venv/
+__pycache__/
+backend/__pycache__/
+frontend/node_modules/
+frontend/dist/
+backend/pneumonia_app.db
+.env
+*.pyc
