@@ -5,3 +5,4 @@ __pycache__/
 *.pyd
 dataset/
 *.h5
+!Pneumonia Detector/backend/model/pneumonia_model.h5
