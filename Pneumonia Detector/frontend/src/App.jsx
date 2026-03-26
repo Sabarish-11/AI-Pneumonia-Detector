@@ -16,6 +16,7 @@ function Dashboard() {
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -37,7 +38,7 @@ function Dashboard() {
 
   const handlePredict = async () => {
     if (!file) {
-      alert("Please upload a chest X‑ray image.");
+      setErrorMessage("Please upload a chest X-ray image.");
       return;
     }
 
@@ -46,6 +47,9 @@ function Dashboard() {
 
     try {
       setLoading(true);
+      setErrorMessage("");
+      setResult(null);
+
       const response = await api.post("/predict", formData);
       setResult(response.data);
 
@@ -57,7 +61,8 @@ function Dashboard() {
         alert("Please login to use the system.");
         navigate("/login");
       } else {
-        alert("Error connecting to backend.");
+        const detail = err.response?.data?.detail;
+        setErrorMessage(detail || "Unable to analyze this file. Please upload a valid chest X-ray image.");
       }
     } finally {
       setLoading(false);
@@ -67,6 +72,12 @@ function Dashboard() {
   const handleFileChange = (newFile) => {
     setFile(newFile);
     setResult(null);
+    setErrorMessage("");
+
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
     if (newFile) {
       const url = URL.createObjectURL(newFile);
       setPreviewUrl(url);
@@ -94,6 +105,7 @@ function Dashboard() {
           setFile={handleFileChange}
           handlePredict={handlePredict}
           loading={loading}
+          errorMessage={errorMessage}
         />
 
         {previewUrl && (
@@ -136,7 +148,6 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* default route: if user opens "/" go to /login */}
       <Route path="/" element={<Navigate to="/login" replace />} />
 
       <Route
@@ -151,6 +162,7 @@ function AppRoutes() {
     </Routes>
   );
 }
+
 function App() {
   return (
     <BrowserRouter>

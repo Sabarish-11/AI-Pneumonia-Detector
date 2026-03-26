@@ -33,6 +33,18 @@
   font-weight: 600;
 }
 
+.upload-error {
+  margin: -4px 0 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  color: #fecaca;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  text-align: left;
+}
+
 .upload-box button {
   width: 100%;
   padding: 10px 0;

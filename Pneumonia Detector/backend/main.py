@@ -12,7 +12,7 @@ from sqlmodel import SQLModel, Field, Session, create_engine, select
 
 import tensorflow as tf
 import numpy as np
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 
 # =====================================================
@@ -24,6 +24,8 @@ DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'pneumonia_app.db')}"
 SECRET_KEY = "CHANGE_THIS_SECRET"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
+MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024
+MIN_IMAGE_DIMENSION = 128
 
 
 # =====================================================
@@ -161,6 +163,80 @@ def preprocess_image(image: Image.Image):
     return np.expand_dims(arr, axis=0)
 
 
+def is_likely_chest_xray(image: Image.Image):
+    rgb_image = image.convert("RGB")
+    grayscale_image = image.convert("L")
+
+    width, height = rgb_image.size
+    aspect_ratio = width / height if height else 0
+    if not 0.3 <= aspect_ratio <= 3.5:
+        return False, "Image proportions are too unusual for chest X-ray analysis."
+
+    rgb_array = np.asarray(rgb_image, dtype=np.float32)
+    grayscale_array = np.asarray(grayscale_image, dtype=np.float32)
+
+    # Chest X-rays are typically grayscale; color photographs show larger channel gaps.
+    mean_channel_gap = float(
+        np.mean(np.abs(rgb_array[:, :, 0] - rgb_array[:, :, 1]))
+        + np.mean(np.abs(rgb_array[:, :, 1] - rgb_array[:, :, 2]))
+        + np.mean(np.abs(rgb_array[:, :, 0] - rgb_array[:, :, 2]))
+    ) / 3.0
+
+    contrast = float(grayscale_array.std())
+
+    if mean_channel_gap > 12:
+        return False, "This appears to be a color photo, not a chest X-ray."
+
+    if contrast < 12:
+        return False, "This image has too little contrast for reliable chest X-ray analysis."
+
+    return True, None
+
+
+def validate_uploaded_image(file: UploadFile, file_bytes: bytes):
+    if not file_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No file data received.",
+        )
+
+    if file.content_type and not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only image uploads are supported.",
+        )
+
+    if len(file_bytes) > MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Image is too large. Please upload a file smaller than 10 MB.",
+        )
+
+    try:
+        image = Image.open(io.BytesIO(file_bytes))
+        image.load()
+    except UnidentifiedImageError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The uploaded file is not a valid image.",
+        )
+
+    if min(image.size) < MIN_IMAGE_DIMENSION:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Image resolution is too low. Please upload a clearer chest X-ray.",
+        )
+
+    is_valid_xray, reason = is_likely_chest_xray(image)
+    if not is_valid_xray:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=reason,
+        )
+
+    return image
+
+
 # =====================================================
 # ROUTES
 # =====================================================
@@ -211,7 +287,8 @@ async def predict(
     session: Session = Depends(get_session),
 ):
     try:
-        image = Image.open(io.BytesIO(await file.read()))
+        file_bytes = await file.read()
+        image = validate_uploaded_image(file, file_bytes)
         processed = preprocess_image(image)
 
         prob = float(model.predict(processed)[0][0])
@@ -237,8 +314,13 @@ async def predict(
             "confidence": round(confidence, 3),
         }
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Prediction failed. Please try again with a valid chest X-ray image.",
+        )
 
 
 # ---------- HISTORY ----------
