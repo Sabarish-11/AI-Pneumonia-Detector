@@ -6,3 +6,7 @@ __pycache__/
 dataset/
 *.h5
 !Pneumonia Detector/backend/model/pneumonia_model.h5
+Pneumonia Detector/frontend/node_modules/
+Pneumonia Detector/frontend/dist/
+Pneumonia Detector/backend/__pycache__/
+Pneumonia Detector/backend/pneumonia_app.db
