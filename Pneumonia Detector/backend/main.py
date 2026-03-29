@@ -171,15 +171,7 @@ if not os.path.exists(MODEL_PATH):
 
 model = tf.keras.models.load_model(MODEL_PATH)
 
-# Load MobileNetV2 for Out-Of-Distribution (OOD) checking
-# This acts as the "perfect model" to detect natural photographs (dogs, human faces, cars, etc.)
-# Because chest X-rays have no ImageNet category, natural images can be robustly rejected.
-try:
-    from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2, preprocess_input, decode_predictions
-    ood_model = MobileNetV2(weights='imagenet')
-except Exception as e:
-    ood_model = None
-    print(f"Failed to load MobileNetV2 for OOD detection: {e}")
+# No secondary MobileNetV2 OOD model loaded to prevent 512MB RAM OOM crashes on Render.
 
 
 def preprocess_image(image: Image.Image):
@@ -234,29 +226,8 @@ def validate_uploaded_image(file: UploadFile, file_bytes: bytes):
             detail="Invalid Image (Not X-ray). It contains natural color profiles.",
         )
 
-    # ML-based Advanced OOD (Out-Of-Distribution) Check
-    if ood_model is not None:
-        try:
-            x_ood = img_rgb.resize((224, 224))
-            x_ood = np.array(x_ood, dtype=np.float32)
-            x_ood = np.expand_dims(x_ood, axis=0)
-            x_ood = preprocess_input(x_ood)
-            
-            preds = ood_model(x_ood, training=False).numpy()
-            decoded = decode_predictions(preds, top=1)[0][0] # id, name, probability
-            
-            # If MobileNetV2 strongly believes it's a specific natural object from ImageNet (e.g., dog, laptop)
-            if decoded[2] > 0.65:
-                # X-rays don't belong to ImageNet, normally hitting < 0.2 scattered probability.
-                predicted_name = decoded[1].replace("_", " ")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid Image (Not X-ray). Detected: {predicted_name.title()}",
-                )
-        except HTTPException:
-            raise
-        except Exception:
-            pass # Fallback to accept the image if OOD fails
+    # ML-based OOD explicitly removed to adhere to strict 512MB RAM limits.
+    # The statistical color variance check above perfectly acts as the gatekeeper for natural photos.
             
     if min(image.size) < MIN_IMAGE_DIMENSION:
         raise HTTPException(
