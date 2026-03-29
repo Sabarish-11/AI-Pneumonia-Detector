@@ -52,8 +52,8 @@ app = FastAPI(title="Pneumonia Detection API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=get_allowed_origins(),
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -207,6 +207,21 @@ def validate_uploaded_image(file: UploadFile, file_bytes: bytes):
             detail="The uploaded file is not a valid image.",
         )
 
+    # Convert to RGB to reliably test channels
+    img_rgb = image.convert("RGB")
+    arr = np.array(img_rgb)
+    
+    # Check if the image has color (not an X-ray)
+    # By computing the std deviation of the color channels, we find out if R, G, and B differ significantly.
+    std_channels = np.std(arr, axis=-1)
+    mean_std = np.mean(std_channels)
+    
+    if mean_std > 10.0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The uploaded image does not appear to be a chest X-ray. Please upload a grayscale X-ray image.",
+        )
+
     if min(image.size) < MIN_IMAGE_DIMENSION:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -235,13 +250,14 @@ def register(
     body: RegisterRequest,
     session: Session = Depends(get_session),
 ):
-    existing = session.exec(select(User).where(User.email == body.email)).first()
+    email_normalized = body.email.lower().strip()
+    existing = session.exec(select(User).where(User.email == email_normalized)).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already exists")
 
     user = User(
         name=body.name,
-        email=body.email,
+        email=email_normalized,
         hashed_password=hash_password(body.password),
     )
     session.add(user)
@@ -255,7 +271,8 @@ def login(
     body: LoginRequest,
     session: Session = Depends(get_session),
 ):
-    user = session.exec(select(User).where(User.email == body.email)).first()
+    email_normalized = body.email.lower().strip()
+    user = session.exec(select(User).where(User.email == email_normalized)).first()
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
