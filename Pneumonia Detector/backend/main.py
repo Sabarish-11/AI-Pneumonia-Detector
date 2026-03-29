@@ -185,7 +185,7 @@ except Exception as e:
 def preprocess_image(image: Image.Image):
     image = image.convert("RGB")
     image = image.resize((224, 224))
-    arr = np.array(image) / 255.0
+    arr = np.array(image, dtype=np.float32) / 255.0
     return np.expand_dims(arr, axis=0)
 
 
@@ -231,7 +231,7 @@ def validate_uploaded_image(file: UploadFile, file_bytes: bytes):
     if mean_std > 30.0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="The uploaded image does not appear to be a chest X-ray. It contains natural color profiles.",
+            detail="Invalid Image (Not X-ray). It contains natural color profiles.",
         )
 
     # ML-based Advanced OOD (Out-Of-Distribution) Check
@@ -242,7 +242,7 @@ def validate_uploaded_image(file: UploadFile, file_bytes: bytes):
             x_ood = np.expand_dims(x_ood, axis=0)
             x_ood = preprocess_input(x_ood)
             
-            preds = ood_model.predict(x_ood, verbose=0)
+            preds = ood_model(x_ood, training=False).numpy()
             decoded = decode_predictions(preds, top=1)[0][0] # id, name, probability
             
             # If MobileNetV2 strongly believes it's a specific natural object from ImageNet (e.g., dog, laptop)
@@ -251,7 +251,7 @@ def validate_uploaded_image(file: UploadFile, file_bytes: bytes):
                 predicted_name = decoded[1].replace("_", " ")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"This looks like a {predicted_name} instead of a chest X-ray! Please upload a valid X-ray image.",
+                    detail=f"Invalid Image (Not X-ray). Detected: {predicted_name.title()}",
                 )
         except HTTPException:
             raise
@@ -328,7 +328,8 @@ async def predict(
         image = validate_uploaded_image(file, file_bytes)
         processed = preprocess_image(image)
 
-        prob = float(model.predict(processed)[0][0])
+        img_tensor = tf.convert_to_tensor(processed, dtype=tf.float32)
+        prob = float(model(img_tensor, training=False).numpy()[0][0])
 
         if prob > 0.5:
             label = "PNEUMONIA"
