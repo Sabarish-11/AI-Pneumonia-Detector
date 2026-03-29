@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from "react-router-dom";
 import api from "./api";
 import Header from "./components/Header.jsx";
@@ -17,6 +17,7 @@ function Dashboard() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const selectedFileRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -37,13 +38,15 @@ function Dashboard() {
   }, [navigate]);
 
   const handlePredict = async () => {
-    if (!file) {
+    const fileToUpload = selectedFileRef.current || file;
+
+    if (!fileToUpload) {
       setErrorMessage("Please upload a chest X-ray image.");
       return;
     }
 
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", fileToUpload);
 
     try {
       setLoading(true);
@@ -70,6 +73,7 @@ function Dashboard() {
   };
 
   const handleFileChange = (newFile) => {
+    selectedFileRef.current = newFile;
     setFile(newFile);
     setResult(null);
     setErrorMessage("");
