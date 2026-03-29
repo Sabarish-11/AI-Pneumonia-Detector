@@ -179,36 +179,6 @@ def preprocess_image(image: Image.Image):
     return np.expand_dims(arr, axis=0)
 
 
-def is_likely_chest_xray(image: Image.Image):
-    rgb_image = image.convert("RGB")
-    grayscale_image = image.convert("L")
-
-    width, height = rgb_image.size
-    aspect_ratio = width / height if height else 0
-    if not 0.3 <= aspect_ratio <= 3.5:
-        return False, "Image proportions are too unusual for chest X-ray analysis."
-
-    rgb_array = np.asarray(rgb_image, dtype=np.float32)
-    grayscale_array = np.asarray(grayscale_image, dtype=np.float32)
-
-    # Chest X-rays are typically grayscale; color photographs show larger channel gaps.
-    mean_channel_gap = float(
-        np.mean(np.abs(rgb_array[:, :, 0] - rgb_array[:, :, 1]))
-        + np.mean(np.abs(rgb_array[:, :, 1] - rgb_array[:, :, 2]))
-        + np.mean(np.abs(rgb_array[:, :, 0] - rgb_array[:, :, 2]))
-    ) / 3.0
-
-    contrast = float(grayscale_array.std())
-
-    if mean_channel_gap > 12:
-        return False, "This appears to be a color photo, not a chest X-ray."
-
-    if contrast < 12:
-        return False, "This image has too little contrast for reliable chest X-ray analysis."
-
-    return True, None
-
-
 def validate_uploaded_image(file: UploadFile, file_bytes: bytes):
     if not file_bytes:
         raise HTTPException(
@@ -241,13 +211,6 @@ def validate_uploaded_image(file: UploadFile, file_bytes: bytes):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Image resolution is too low. Please upload a clearer chest X-ray.",
-        )
-
-    is_valid_xray, reason = is_likely_chest_xray(image)
-    if not is_valid_xray:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=reason,
         )
 
     return image
