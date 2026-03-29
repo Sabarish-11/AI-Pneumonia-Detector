@@ -171,6 +171,16 @@ if not os.path.exists(MODEL_PATH):
 
 model = tf.keras.models.load_model(MODEL_PATH)
 
+# Load MobileNetV2 for Out-Of-Distribution (OOD) checking
+# This acts as the "perfect model" to detect natural photographs (dogs, human faces, cars, etc.)
+# Because chest X-rays have no ImageNet category, natural images can be robustly rejected.
+try:
+    from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2, preprocess_input, decode_predictions
+    ood_model = MobileNetV2(weights='imagenet')
+except Exception as e:
+    ood_model = None
+    print(f"Failed to load MobileNetV2 for OOD detection: {e}")
+
 
 def preprocess_image(image: Image.Image):
     image = image.convert("RGB")
@@ -207,21 +217,47 @@ def validate_uploaded_image(file: UploadFile, file_bytes: bytes):
             detail="The uploaded file is not a valid image.",
         )
 
-    # Convert to RGB to reliably test channels
-    img_rgb = image.convert("RGB")
+    # To safely test for color variance without OOM errors, resize image to a small thumbnail
+    img_rgb = image.convert("RGB").resize((150, 150))
     arr = np.array(img_rgb)
     
-    # Check if the image has color (not an X-ray)
+    # Check if the image has natural color (not an X-ray)
     # By computing the std deviation of the color channels, we find out if R, G, and B differ significantly.
     std_channels = np.std(arr, axis=-1)
     mean_std = np.mean(std_channels)
     
-    if mean_std > 10.0:
+    # Threshold 30.0 cleanly allows valid X-rays (even if slightly tinted blue/yellow)
+    # while correctly rejecting colorful photos (like a dog, human selfie, or scenery).
+    if mean_std > 30.0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="The uploaded image does not appear to be a chest X-ray. Please upload a grayscale X-ray image.",
+            detail="The uploaded image does not appear to be a chest X-ray. It contains natural color profiles.",
         )
 
+    # ML-based Advanced OOD (Out-Of-Distribution) Check
+    if ood_model is not None:
+        try:
+            x_ood = img_rgb.resize((224, 224))
+            x_ood = np.array(x_ood, dtype=np.float32)
+            x_ood = np.expand_dims(x_ood, axis=0)
+            x_ood = preprocess_input(x_ood)
+            
+            preds = ood_model.predict(x_ood, verbose=0)
+            decoded = decode_predictions(preds, top=1)[0][0] # id, name, probability
+            
+            # If MobileNetV2 strongly believes it's a specific natural object from ImageNet (e.g., dog, laptop)
+            if decoded[2] > 0.65:
+                # X-rays don't belong to ImageNet, normally hitting < 0.2 scattered probability.
+                predicted_name = decoded[1].replace("_", " ")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"This looks like a {predicted_name} instead of a chest X-ray! Please upload a valid X-ray image.",
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass # Fallback to accept the image if OOD fails
+            
     if min(image.size) < MIN_IMAGE_DIMENSION:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
