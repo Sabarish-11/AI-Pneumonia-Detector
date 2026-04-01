@@ -265,10 +265,10 @@ def validate_uploaded_image(file: UploadFile, file_bytes: bytes):
     # High frequency features (sharp grass, hair, text) are exceptionally dense in photos/docs compared to blurry soft-tissue X-rays.
     diff_x = np.abs(np.diff(gray_arr, axis=1))
     diff_y = np.abs(np.diff(gray_arr, axis=0))
-    edges = (diff_x[:, :-1] > 20) | (diff_y[:-1, :] > 20)
+    edges = (diff_x[:-1, :] > 20) | (diff_y[:, :-1] > 20)
     edge_ratio = np.mean(edges)
     
-    if edge_ratio > 0.08:
+    if edge_ratio > 0.12:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid Image (Too many sharp edges/textures to be a valid chest X-ray)",
