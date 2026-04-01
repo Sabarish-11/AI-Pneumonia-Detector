@@ -245,6 +245,35 @@ def validate_uploaded_image(file: UploadFile, file_bytes: bytes):
             detail="Invalid Image (Please upload a chest X-ray)",
         )
 
+    # 4. Structural Spatial Anatomy Check (Black and white portraits/landscapes bypass color)
+    gray = image.convert("L").resize((150, 150))
+    gray_arr = np.array(gray, dtype=np.float32)
+    
+    left = np.mean(gray_arr[:, 0:40])
+    center = np.mean(gray_arr[:, 55:95])
+    right = np.mean(gray_arr[:, 110:150])
+    
+    # Chest X-rays have a bright center (spine/heart) and dark sides (lungs).
+    # If the center is abnormally dark compared to the peripheries, it structurally fails.
+    if center < left * 0.85 and center < right * 0.85:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Image (Does not match structural layout of a chest X-ray)",
+        )
+
+    # 5. Texture Edge Check
+    # High frequency features (sharp grass, hair, text) are exceptionally dense in photos/docs compared to blurry soft-tissue X-rays.
+    diff_x = np.abs(np.diff(gray_arr, axis=1))
+    diff_y = np.abs(np.diff(gray_arr, axis=0))
+    edges = (diff_x[:, :-1] > 20) | (diff_y[:-1, :] > 20)
+    edge_ratio = np.mean(edges)
+    
+    if edge_ratio > 0.08:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Image (Too many sharp edges/textures to be a valid chest X-ray)",
+        )
+
     # ML-based OOD explicitly removed to adhere to strict 512MB RAM limits.
     # The statistical color variance check above perfectly acts as the gatekeeper for natural photos.
             
