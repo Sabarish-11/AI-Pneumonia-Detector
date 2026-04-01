@@ -2,7 +2,7 @@ fastapi
 uvicorn[standard]
 pillow
 numpy
-tensorflow
+tensorflow-cpu
 sqlmodel
 python-jose[cryptography]
 passlib

@@ -168,12 +168,19 @@ def get_current_user(
 # =====================================================
 # ML MODEL
 # =====================================================
-MODEL_PATH = os.path.join(BASE_DIR, "model", "pneumonia_model.h5")
+# Hard cap TensorFlow OS threading to prevent memory spike
+tf.config.threading.set_inter_op_parallelism_threads(1)
+tf.config.threading.set_intra_op_parallelism_threads(1)
+
+MODEL_PATH = os.path.join(BASE_DIR, "model", "pneumonia_model.tflite")
 
 if not os.path.exists(MODEL_PATH):
-    raise RuntimeError("Model file not found")
+    raise RuntimeError("TFLite Model file not found")
 
-model = tf.keras.models.load_model(MODEL_PATH)
+interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
+interpreter.allocate_tensors()
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
 
 # No secondary MobileNetV2 OOD model loaded to prevent 512MB RAM OOM crashes on Render.
 
@@ -310,8 +317,11 @@ async def predict(
         image = validate_uploaded_image(file, file_bytes)
         processed = preprocess_image(image)
 
-        img_tensor = tf.convert_to_tensor(processed, dtype=tf.float32)
-        prob = float(model(img_tensor, training=False).numpy()[0][0])
+        # TFLite inference
+        interpreter.set_tensor(input_details[0]['index'], processed)
+        interpreter.invoke()
+        output_data = interpreter.get_tensor(output_details[0]['index'])
+        prob = float(output_data[0][0])
 
         if prob > 0.5:
             label = "PNEUMONIA"
