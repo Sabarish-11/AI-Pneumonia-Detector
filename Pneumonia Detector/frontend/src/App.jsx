@@ -36,14 +36,14 @@ function Dashboard() {
     fetchHistory();
   }, [navigate]);
 
-  const handlePredict = async (selectedFile) => {
-    if (!selectedFile) {
+  const handlePredict = async () => {
+    if (!file) {
       setErrorMessage("Please upload a chest X-ray image.");
       return;
     }
 
     const formData = new FormData();
-    formData.append("file", selectedFile);
+    formData.append("file", file);
 
     try {
       setLoading(true);

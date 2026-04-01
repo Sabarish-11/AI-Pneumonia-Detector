@@ -2,6 +2,10 @@ from datetime import datetime, timedelta
 from typing import Optional
 import io
 import os
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -223,7 +227,7 @@ def validate_uploaded_image(file: UploadFile, file_bytes: bytes):
     if mean_std > 30.0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid Image (Not X-ray). It contains natural color profiles.",
+            detail="Invalid Image (Please upload a chest X-ray)",
         )
 
     # ML-based OOD explicitly removed to adhere to strict 512MB RAM limits.
@@ -294,7 +298,14 @@ async def predict(
     user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
+    import gc
+    file_bytes = None
+    image = None
+    processed = None
+    img_tensor = None
+
     try:
+        await file.seek(0)
         file_bytes = await file.read()
         image = validate_uploaded_image(file, file_bytes)
         processed = preprocess_image(image)
@@ -325,11 +336,32 @@ async def predict(
 
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
+        logger.error(f"Prediction error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Prediction failed. Please try again with a valid chest X-ray image.",
         )
+    finally:
+        await file.close()
+        
+        # Explicit garbage collection for reliable state and RAM limit (e.g. Render 512MB)
+        if image is not None:
+            try:
+                if hasattr(image, "close"):
+                    image.close()
+            except Exception:
+                pass
+        
+        try:
+            del file_bytes
+            del image
+            del processed
+            del img_tensor
+        except Exception:
+            pass
+            
+        gc.collect()
 
 
 # ---------- HISTORY ----------
