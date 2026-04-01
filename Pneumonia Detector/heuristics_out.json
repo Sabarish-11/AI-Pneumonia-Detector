@@ -1,0 +1,29 @@
+{
+    "fake_xray": {
+        "mean_std": 0.0,
+        "max_std": 0.0,
+        "color_ratio": 0.0,
+        "hue_std": 0.0,
+        "mean_sat": 0.0,
+        "max_sat": 0.0,
+        "edge_energy": 1.0
+    },
+    "tinted_xray": {
+        "mean_std": 8.01,
+        "max_std": 11.31,
+        "color_ratio": 0.0,
+        "hue_std": 0.0,
+        "mean_sat": 62.43,
+        "max_sat": 255.0,
+        "edge_energy": 1.01
+    },
+    "cisco_screenshot": {
+        "mean_std": 4.71,
+        "max_std": 120.21,
+        "color_ratio": 0.0392,
+        "hue_std": 42.5,
+        "mean_sat": 10.0,
+        "max_sat": 255.0,
+        "edge_energy": 1.24
+    }
+}

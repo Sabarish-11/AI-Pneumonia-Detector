@@ -224,14 +224,22 @@ def validate_uploaded_image(file: UploadFile, file_bytes: bytes):
     img_rgb = image.convert("RGB").resize((150, 150))
     arr = np.array(img_rgb)
     
-    # Check if the image has natural color (not an X-ray)
-    # By computing the std deviation of the color channels, we find out if R, G, and B differ significantly.
+    # 1. Mean color variance (highly colorful natural photos)
     std_channels = np.std(arr, axis=-1)
     mean_std = np.mean(std_channels)
     
-    # Threshold 30.0 cleanly allows valid X-rays (even if slightly tinted blue/yellow)
-    # while correctly rejecting colorful photos (like a dog, human selfie, or scenery).
-    if mean_std > 30.0:
+    # 2. Max color variance (blocks of pure color, common in screenshots/UI)
+    max_std = np.max(std_channels)
+
+    # 3. Hue variance (multiple distinct colors)
+    img_hsv = image.convert("HSV").resize((150, 150))
+    hsv_arr = np.array(img_hsv)
+    hue = hsv_arr[..., 0]
+    sat = hsv_arr[..., 1]
+    # calculate hue standard deviation only on pixels that actually have color
+    hue_std = np.std(hue[sat > 10]) if np.any(sat > 10) else 0.0
+
+    if mean_std > 30.0 or max_std > 60.0 or hue_std > 20.0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid Image (Please upload a chest X-ray)",
