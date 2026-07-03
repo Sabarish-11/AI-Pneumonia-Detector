@@ -7,6 +7,7 @@ import ResultCard from "./components/ResultCard.jsx";
 import Login from "./components/Login.jsx";
 import Register from "./components/Register.jsx";
 import History from "./components/History.jsx";
+import Toast from "./components/Toast.jsx";
 import "./styles/App.css";
 
 
@@ -17,6 +18,7 @@ function Dashboard() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [toast, setToast] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,9 +29,8 @@ function Dashboard() {
       } catch (err) {
         console.error(err);
         if (err.response && err.response.status === 401) {
-          alert("Session expired. Please login again.");
           localStorage.removeItem("access_token");
-          navigate("/login");
+          navigate("/login", { state: { toastMessage: "Session expired. Please login again.", toastType: "error" } });
         }
       }
     };
@@ -39,6 +40,7 @@ function Dashboard() {
   const handlePredict = async () => {
     if (!file) {
       setErrorMessage("Please upload a chest X-ray image.");
+      setToast({ message: "Please upload a chest X-ray image.", type: "error" });
       return;
     }
 
@@ -52,17 +54,19 @@ function Dashboard() {
 
       const response = await api.post("/predict", formData);
       setResult(response.data);
+      setToast({ message: "Analysis complete!", type: "success" });
 
       const histRes = await api.get("/history");
       setHistory(histRes.data);
     } catch (err) {
       console.error(err);
       if (err.response && err.response.status === 401) {
-        alert("Please login to use the system.");
-        navigate("/login");
+        localStorage.removeItem("access_token");
+        navigate("/login", { state: { toastMessage: "Please login to use the system.", toastType: "error" } });
       } else {
         const detail = err.response?.data?.detail;
         setErrorMessage(detail || "Unable to analyze this file. Please upload a valid chest X-ray image.");
+        setToast({ message: detail || "Prediction failed. Try again.", type: "error" });
       }
     } finally {
       setLoading(false);
@@ -88,7 +92,7 @@ function Dashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem("access_token");
-    navigate("/login");
+    navigate("/login", { state: { toastMessage: "Logged out successfully.", toastType: "info" } });
   };
 
   return (
@@ -102,6 +106,7 @@ function Dashboard() {
         </div>
 
         <UploadBox
+          file={file}
           setFile={handleFileChange}
           handlePredict={handlePredict}
           loading={loading}
@@ -123,6 +128,14 @@ function Dashboard() {
           This system is an academic AI screening tool and not a certified medical device.
           Results are probabilistic and must be reviewed by a qualified clinician.
         </p>
+
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
       </div>
     </div>
   );
@@ -136,7 +149,7 @@ function AppRoutes() {
   };
 
   const handleRegisterSuccess = () => {
-    navigate("/login");
+    navigate("/login", { state: { toastMessage: "Registered successfully. You can login now.", toastType: "success" } });
   };
 
   useEffect(() => {

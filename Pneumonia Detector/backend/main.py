@@ -8,6 +8,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -351,13 +352,16 @@ async def predict(
     try:
         await file.seek(0)
         file_bytes = await file.read()
-        image = validate_uploaded_image(file, file_bytes)
-        processed = preprocess_image(image)
+        image = await run_in_threadpool(validate_uploaded_image, file, file_bytes)
+        processed = await run_in_threadpool(preprocess_image, image)
 
         # TFLite inference
-        interpreter.set_tensor(input_details[0]['index'], processed)
-        interpreter.invoke()
-        output_data = interpreter.get_tensor(output_details[0]['index'])
+        def run_inference():
+            interpreter.set_tensor(input_details[0]['index'], processed)
+            interpreter.invoke()
+            return interpreter.get_tensor(output_details[0]['index'])
+
+        output_data = await run_in_threadpool(run_inference)
         prob = float(output_data[0][0])
 
         if prob > 0.5:

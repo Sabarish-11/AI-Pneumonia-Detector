@@ -1,44 +1,191 @@
-.result-card {
+.diagnostic-card-wrapper {
   margin-top: 24px;
-  background: rgba(0, 0, 0, 0.55);
-  padding: 18px 16px;
-  border-radius: 14px;
-  text-align: center;
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  animation: scale-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  text-align: left;
 }
 
-.result-card h2 {
-  font-size: 1.1rem;
-  margin-bottom: 10px;
+.diag-normal {
+  border-left: 5px solid var(--color-success);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, rgba(13, 23, 42, 0.8) 100%);
+  box-shadow: 0 12px 30px rgba(16, 185, 129, 0.05);
 }
 
-.result-card p {
-  margin-bottom: 6px;
-  font-size: 1rem;
+.diag-pneumonia {
+  border-left: 5px solid var(--color-danger);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.03) 0%, rgba(13, 23, 42, 0.8) 100%);
+  box-shadow: 0 12px 30px rgba(239, 68, 68, 0.05);
 }
 
-.result-card .normal {
-  color: #4caf50;
+.diagnostic-badge-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.analysis-tag {
+  font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
 }
 
-.result-card .pneumonia {
-  color: #ff5252;
+.diagnostic-status-pill {
+  font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  padding: 4px 10px;
+  border-radius: 20px;
+  text-transform: uppercase;
 }
 
-.result-card .risk-high {
-  color: #ff5252;
-  font-size: 0.9rem;
+.diagnostic-status-pill.status-clear {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--color-success);
+  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
-.result-card .risk-medium {
-  color: #ffca28;
-  font-size: 0.9rem;
+.diagnostic-status-pill.status-warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--color-warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
-.result-card .risk-low {
-  color: #81c784;
+.diagnostic-status-pill.status-critical {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--color-danger);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  animation: alarm-pulse 2s infinite ease-in-out;
+}
+
+.diagnostic-status-pill.status-marginal {
+  background: rgba(100, 116, 139, 0.15);
+  color: var(--text-secondary);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+.diagnostic-main-content {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.diagnostic-status-icon {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diag-normal .diagnostic-status-icon {
+  background: rgba(16, 185, 129, 0.08);
+  color: var(--color-success);
+}
+
+.diag-pneumonia .diagnostic-status-icon {
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--color-danger);
+}
+
+.diagnostic-results-info h2 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.confidence-indicator-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.confidence-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.confidence-percentage {
   font-size: 0.9rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+/* Graphical Progress Bar */
+.diagnostic-progress-bar-container {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.diagnostic-progress-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.2);
+}
+
+/* Clinical Triage Disclaimer details */
+.diagnostic-footer-warning {
+  border-top: 1px solid var(--border-light);
+  padding-top: 16px;
+}
+
+.diagnostic-footer-warning p {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.diagnostic-footer-warning p.status-clear {
+  color: var(--text-secondary);
+}
+
+.diagnostic-footer-warning p.status-critical {
+  color: #fca5a5;
+}
+
+.diagnostic-footer-warning p.status-warning {
+  color: #fcd34d;
+}
+
+.diagnostic-footer-warning p.status-marginal {
+  color: var(--text-secondary);
+}
+
+@keyframes scale-up {
+  from {
+    transform: scale(0.97);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes alarm-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0px rgba(239, 68, 68, 0);
+  }
+  50% {
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.2);
+  }
 }
